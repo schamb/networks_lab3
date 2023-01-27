@@ -25,7 +25,7 @@ int sendPDU(int clientSocket, uint8_t* dataBuffer, int lengthOfData){
 int recvPDU(int socketNumber, uint8_t* dataBuffer, int bufferSize){
     uint8_t message_length=0;
     safeRecv(socketNumber, &message_length, 2, MSG_WAITALL);
-    printf("---Message length: %d\n", message_length);
+    //printf("---Message length: %d\n", message_length);
 
     // if(bufferSize < message_length){
     //     perror("buffer size");
