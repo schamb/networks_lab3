@@ -27,6 +27,7 @@
 int safeRecv(int socketNum, uint8_t * buffer, int bufferLen, int flag)
 {
     int bytesReceived = recv(socketNum, buffer, bufferLen, flag);
+    
     if (bytesReceived < 0)
     {
         if (errno == ECONNRESET)
