@@ -113,13 +113,23 @@ void serverControl(int portNumber){
 		int ready_socket = pollCall(-1);
 
 		//If poll() returns the main server socket, call addNewClient().
-		if(ready_socket == mainServerSocket) addNewClient(mainServerSocket); 
+		if(ready_socket == mainServerSocket) {
+			addNewClient(mainServerSocket);
+		} 
 
 		//If poll() returns a client socket, call processClient(). 
-		else if(ready_socket != -1) processClient(ready_socket);
+		else if(ready_socket != -1) {
+			processClient(ready_socket);
+			/* 
+			getFlag() -> sendMessage(), listHandles(), exitClient()
+			sendMessage() -> checkValidHandles(), checkMessageType(), sendPDU()
+			*/
+		}
 
 		//timeout
-		else fprintf(stderr, "timeout\n");
+		else {
+			fprintf(stderr, "timeout\n");
+		}
 	}
 	
 	//close 
