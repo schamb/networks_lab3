@@ -21,34 +21,41 @@
 #include <netdb.h>
 #include <stdint.h>
 #include <poll.h>
+#include <signal.h>
 
 #include "networks.h"
 #include "safeUtil.h"
 #include "pdu_functions.h"
 #include "pollLib.h"
+#include "socketTable.h"
 
 #define MAXBUF 1024
 #define DEBUG_FLAG 1
+static int mainServerSocket = 0;
 
-void recvFromClient(int clientSocket);
+void recvFromClient(sockTable *st, int clientSocket);
 int checkArgs(int argc, char *argv[]);
-void serverControl(int portNumber);
-void addNewClient(int mainServerSocket);
-void processClient(int clientSocket);
+void serverControl(sockTable *st, int portNumber);
+void addNewClient(); //(int mainServerSocket)
+void processClient(sockTable *st, int clientSocket);
+void sigHandler(int signo);
+void sendMessageToNextClient(int clientSocket, uint8_t *dataBuffer, int messageLen);
+char *getMessageType();
 
 
 int main(int argc, char *argv[])
 {
+	signal(SIGINT, sigHandler);
 	//setup port number
 	int portNumber = 0;
 	portNumber = checkArgs(argc, argv);
-	
-	serverControl(portNumber);
-	
+	struct sockTable *st = newSockTable();
+	serverControl(st, portNumber);
+	freeSockTable(st);
 	return 0;
 }
 
-void recvFromClient(int clientSocket)
+void recvFromClient(sockTable *st, int clientSocket)
 {
 	uint8_t dataBuffer[MAXBUF];
 	int messageLen = 0;
@@ -63,16 +70,16 @@ void recvFromClient(int clientSocket)
 
 	if (messageLen > 0)
 	{
-		printf("Message received, length: %d Data: %s\n", messageLen, dataBuffer);
+		sendMessageToNextClient(clientSocket, dataBuffer, messageLen);
+		//printf("Message received, length: %d Data: %s\n", messageLen, dataBuffer);
 	}
 	else
 	{
 		printf("Connection closed by other side\n");
 		removeFromPollSet(clientSocket);
+		removeClientSock(st, clientSocket); //removes from st and frees cs
 		close(clientSocket);
 	}
-	
-	
 }
 
 int checkArgs(int argc, char *argv[])
@@ -94,10 +101,14 @@ int checkArgs(int argc, char *argv[])
 	return portNumber;
 }
 
+char *getMessageType() {
+	return NULL;
+}
 
-void serverControl(int portNumber){
 
-	int mainServerSocket = 0;   //socket descriptor for the server socket
+void serverControl(sockTable *st, int portNumber){
+
+	//int mainServerSocket = 0;   //socket descriptor for the server socket
 
 	//setup poll set
 	setupPollSet();
@@ -115,11 +126,14 @@ void serverControl(int portNumber){
 		//If poll() returns the main server socket, call addNewClient().
 		if(ready_socket == mainServerSocket) {
 			addNewClient(mainServerSocket);
+			addClientToSockTable(st, mainServerSocket, getHandleName(st, mainServerSocket));
 		} 
 
 		//If poll() returns a client socket, call processClient(). 
 		else if(ready_socket != -1) {
-			processClient(ready_socket);
+			processClient(st, ready_socket);
+			//char* m_type = getMessageType(); 
+
 			/* 
 			getFlag() -> sendMessage(), listHandles(), exitClient()
 			sendMessage() -> checkValidHandles(), checkMessageType(), sendPDU()
@@ -131,13 +145,11 @@ void serverControl(int portNumber){
 			fprintf(stderr, "timeout\n");
 		}
 	}
-	
-	//close 
-	close(mainServerSocket);
-
+	// removeFromPollSet(mainServerSocket);
+	// close(mainServerSocket);
 }
 
-void addNewClient(int mainServerSocket){
+void addNewClient() { //(int mainServerSocket)
 	int clientSocket = 0;   //socket descriptor for the client socket
 
 	//accept client
@@ -147,7 +159,34 @@ void addNewClient(int mainServerSocket){
 	addToPollSet(clientSocket);
 }
 
-void processClient(int clientSocket){
+void processClient(sockTable *st, int clientSocket){
 	//recvPDU
-	recvFromClient(clientSocket);
+	recvFromClient(st, clientSocket);
+}
+
+
+void sigHandler(int signo) {
+    signal(signo, SIG_IGN);
+	removeFromPollSet(mainServerSocket);
+	freePollSet();
+	close(mainServerSocket);	
+}
+
+//process message
+//pass along to next client via socketnum
+void sendMessageToNextClient(int clientSocket, uint8_t *dataBuffer, int messageLen)
+{
+	//uint8_t sendBuf[MAXBUF];   //data buffer
+	//int sendLen = 0;        //amount of data to send
+	int sent = 0;            //actual amount of data sent/* get the data and send it   */
+
+	sent = sendPDU(clientSocket, dataBuffer, messageLen);
+	if (sent < 0)
+	{
+		perror("send call");
+		exit(-1);
+	}
+
+	//printf("Amount of data sent is: %d\n", sent);
+	
 }

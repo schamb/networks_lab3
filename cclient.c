@@ -24,32 +24,38 @@
 #include "networks.h"
 #include "safeUtil.h"
 #include "pdu_functions.h"
+#include "socketTable.h"
 
 #define MAXBUF 1024
 #define DEBUG_FLAG 1
 
-void sendToServer(int socketNum);
+void recvFromClientByServer(int clientSocketNum);
+void sendToServer(int clientSocketNum);
 int readFromStdin(uint8_t * buffer);
 void checkArgs(int argc, char * argv[]);
 
 int main(int argc, char * argv[])
 {
-	int socketNum = 0;         //socket descriptor
+	int clientSocketNum = 0;         //socket descriptor
 	
 	checkArgs(argc, argv);
 
 	/* set up the TCP Client socket  */
-	socketNum = tcpClientSetup(argv[1], argv[2], DEBUG_FLAG);
+	clientSocketNum = tcpClientSetup(argv[1], argv[2], DEBUG_FLAG);
 	
-	while(1){sendToServer(socketNum);}
-	//sendToServer(socketNum);
+	while(1) {
+		sendToServer(clientSocketNum);
+		recvFromClientByServer(clientSocketNum);
+		
+	}
+	//sendToServer(clientSocketNum);
 	
-	close(socketNum);
+	close(clientSocketNum);
 	
 	return 0;
 }
 
-void sendToServer(int socketNum)
+void sendToServer(int clientSocketNum)
 {
 	uint8_t sendBuf[MAXBUF];   //data buffer
 	int sendLen = 0;        //amount of data to send
@@ -64,7 +70,7 @@ void sendToServer(int socketNum)
 	formatPacket()  
 	*/
 
-	sent = sendPDU(socketNum, sendBuf, sendLen);
+	sent = sendPDU(clientSocketNum, sendBuf, sendLen);
 	if (sent < 0)
 	{
 		perror("send call");
@@ -73,6 +79,29 @@ void sendToServer(int socketNum)
 
 	printf("Amount of data sent is: %d\n", sent);
 	
+}
+
+void recvFromClientByServer(int clientSocketNum)
+{
+	uint8_t dataBuffer[MAXBUF];
+	int messageLen = 0;
+	
+	
+	//now get the data from the client_socket
+	if ((messageLen = recvPDU(clientSocketNum, dataBuffer, MAXBUF)) < 0)
+	{
+		perror("recv call");
+		exit(-1);
+	}
+
+	if (messageLen > 0)
+	{
+		printf("Message received, length: %d Data: %s\n", messageLen, dataBuffer);
+	}
+	else
+	{
+		printf("Connection closed by other side\n");
+	}
 }
 
 int readFromStdin(uint8_t * buffer)

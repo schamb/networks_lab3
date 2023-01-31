@@ -126,5 +126,7 @@ static void growPollSet(int newSetSize)
 	currentPollSetSize = newSetSize;
 }
 
-
+void freePollSet() {
+	free(pollFileDescriptors);
+}
 
